@@ -28,6 +28,24 @@
 
 #define SB3_URI "http://gareus.org/oss/lv2/b_synth"
 
+// fix for -fvisibility=hidden
+#undef LV2_SYMBOL_EXPORT
+#ifdef JACK_DESCRIPT
+#    define LV2_SYMBOL_EXPORT
+#else
+#    ifdef _WIN32
+#        define LV2_SYMBOL_EXPORT __declspec(dllexport)
+#    else
+#        define LV2_SYMBOL_EXPORT  __attribute__ ((visibility ("default")))
+#    endif
+#endif
+
+#ifdef HAVE_LV2_1_8
+#define x_forge_object lv2_atom_forge_object
+#else
+#define x_forge_object lv2_atom_forge_blank
+#endif
+
 #define SB3__state   SB3_URI "#state"
 #define SB3__uiinit  SB3_URI "#uiinit"
 #define SB3__uimccq  SB3_URI "#uimccquery"
@@ -43,12 +61,18 @@
 #define SB3__loadcfg SB3_URI "#loadcfg"
 #define SB3__savecfg SB3_URI "#savecfg"
 #define SB3__uimsg   SB3_URI "#uimessage"
+#define SB3__kactive SB3_URI "#activekeys"
+#define SB3__karray  SB3_URI "#keyarray"
+#define SB3__cfgstr  SB3_URI "#cfgstr"
+#define SB3__cfgkv   SB3_URI "#cfgkv"
 
 typedef struct {
 	LV2_URID atom_Blank;
+	LV2_URID atom_Object;
 	LV2_URID atom_Path;
 	LV2_URID atom_String;
 	LV2_URID atom_Int;
+	LV2_URID atom_Vector;
 	LV2_URID atom_URID;
 	LV2_URID atom_eventTransfer;
 
@@ -67,6 +91,10 @@ typedef struct {
 	LV2_URID sb3_loadcfg;
 	LV2_URID sb3_savecfg;
 	LV2_URID sb3_uimsg;
+	LV2_URID sb3_activekeys;
+	LV2_URID sb3_keyarrary;
+	LV2_URID sb3_cfgstr;
+	LV2_URID sb3_cfgkv;
 
 	LV2_URID midi_MidiEvent;
 	LV2_URID atom_Sequence;
@@ -76,9 +104,11 @@ static inline void
 map_setbfree_uris(LV2_URID_Map* map, setBfreeURIs* uris)
 {
 	uris->atom_Blank         = map->map(map->handle, LV2_ATOM__Blank);
+	uris->atom_Object        = map->map(map->handle, LV2_ATOM__Object);
 	uris->atom_Path          = map->map(map->handle, LV2_ATOM__Path);
 	uris->atom_String        = map->map(map->handle, LV2_ATOM__String);
 	uris->atom_Int           = map->map(map->handle, LV2_ATOM__Int);
+	uris->atom_Vector        = map->map(map->handle, LV2_ATOM__Vector);
 	uris->atom_URID          = map->map(map->handle, LV2_ATOM__URID);
 	uris->atom_eventTransfer = map->map(map->handle, LV2_ATOM__eventTransfer);
 	uris->sb3_state          = map->map(map->handle, SB3__state);
@@ -92,12 +122,16 @@ map_setbfree_uris(LV2_URID_Map* map, setBfreeURIs* uris)
 	uris->sb3_ccval          = map->map(map->handle, SB3__ccval);
 	uris->sb3_ccdsc          = map->map(map->handle, SB3__ccdsc);
 	uris->midi_MidiEvent     = map->map(map->handle, LV2_MIDI__MidiEvent);
-  uris->atom_Sequence      = map->map(map->handle, LV2_ATOM__Sequence);
+	uris->atom_Sequence      = map->map(map->handle, LV2_ATOM__Sequence);
 	uris->sb3_loadpgm        = map->map(map->handle, SB3__loadpgm);
 	uris->sb3_savepgm        = map->map(map->handle, SB3__savepgm);
 	uris->sb3_loadcfg        = map->map(map->handle, SB3__loadcfg);
 	uris->sb3_savecfg        = map->map(map->handle, SB3__savecfg);
 	uris->sb3_uimsg          = map->map(map->handle, SB3__uimsg);
+	uris->sb3_activekeys     = map->map(map->handle, SB3__kactive);
+	uris->sb3_keyarrary      = map->map(map->handle, SB3__karray);
+	uris->sb3_cfgstr         = map->map(map->handle, SB3__cfgstr);
+	uris->sb3_cfgkv          = map->map(map->handle, SB3__cfgkv);
 }
 
 static inline void
@@ -126,7 +160,7 @@ forge_kvcontrolmessage(LV2_Atom_Forge* forge,
 
 	LV2_Atom_Forge_Frame frame;
 	lv2_atom_forge_frame_time(forge, 0);
-	LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_blank(forge, &frame, 1, uris->sb3_control);
+	LV2_Atom* msg = (LV2_Atom*)x_forge_object(forge, &frame, 1, uris->sb3_control);
 
 	lv2_atom_forge_property_head(forge, uris->sb3_cckey, 0);
 	lv2_atom_forge_string(forge, key, strlen(key));
@@ -135,6 +169,25 @@ forge_kvcontrolmessage(LV2_Atom_Forge* forge,
 	lv2_atom_forge_pop(forge, &frame);
 	return msg;
 }
+
+static inline LV2_Atom *
+forge_kvconfigmessage(LV2_Atom_Forge* forge,
+		const setBfreeURIs* uris,
+		LV2_URID uri,
+		const char* key, const char* value)
+{
+	LV2_Atom_Forge_Frame frame;
+	lv2_atom_forge_frame_time(forge, 0);
+	LV2_Atom* msg = (LV2_Atom*)x_forge_object(forge, &frame, 1, uri);
+
+	lv2_atom_forge_property_head(forge, uris->sb3_cckey, 0);
+	lv2_atom_forge_string(forge, key, strlen(key));
+	lv2_atom_forge_property_head(forge, uris->sb3_ccval, 0);
+	lv2_atom_forge_string(forge, value, strlen(value));
+	lv2_atom_forge_pop(forge, &frame);
+	return msg;
+}
+
 
 static inline int
 get_cc_key_value(

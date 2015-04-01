@@ -1,7 +1,7 @@
 /* setBfree - DSP tonewheel organ
  *
  * Copyright (C) 2003-2004 Fredrik Kilander <fk@dsv.su.se>
- * Copyright (C) 2008-2012 Robin Gareus <robin@gareus.org>
+ * Copyright (C) 2008-2015 Robin Gareus <robin@gareus.org>
  * Copyright (C) 2012 Will Panther <pantherb@setbfree.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,6 +17,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+#ifndef CONFIGDOCONLY
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -103,6 +105,8 @@ static const char * ccFuncNames[] = {
 
   "vibrato.knob",		/* off/v1/c1/v2/c2/v3/c3 */
   "vibrato.routing",		/* off/lower/upper/both */
+  "vibrato.upper",		/* off/on */
+  "vibrato.lower",		/* off/on */
 
   "swellpedal1",		/* Volume, for primary ctrlr (mod wheel) */
   "swellpedal2",		/* Volume, for secondary ctrlr (expression) */
@@ -134,8 +138,8 @@ static const char * ccFuncNames[] = {
   "whirl.drum.filter.q",
   "whirl.drum.filter.gain",
 
-  "whirl.horn.breakpos",
-  "whirl.drum.breakpos",
+  "whirl.horn.brakepos",
+  "whirl.drum.brakepos",
 
   "whirl.horn.acceleration",
   "whirl.horn.deceleration",
@@ -178,12 +182,6 @@ typedef struct {
   int8_t id; //< reverse mapping to ccFuncNames[]
   midiCCmap *mm; //< linked list of mapped MIDI CCs
 } ctrl_function;
-
-typedef uint8_t midiccflags_t;
-
-enum { // 1,2,4,8,.. - adjust ctrlflg once >8 to uint16_t
-  MFLAG_INV = 1,
-};
 
 /* ---------------------------------------------------------------- */
 
@@ -918,16 +916,6 @@ void midiPrimeControllerMapping (void *mcfg) {
   loadCCMap (m, "overdrive.character",   93, m->ctrlUseA, NULL, NULL);
 
   loadCCMap (m, "convolution.mix", 94, m->ctrlUseA, NULL, NULL);
-
-#if 0 // leslie testing
-  loadCCMap (m, "whirl.horn.breakpos", 34, m->ctrlUseA, NULL, NULL);
-  loadCCMap (m, "whirl.drum.breakpos", 35, m->ctrlUseA, NULL, NULL);
-
-  loadCCMap (m, "whirl.horn.acceleration", 36, m->ctrlUseA, NULL, NULL);
-  loadCCMap (m, "whirl.horn.deceleration", 37, m->ctrlUseA, NULL, NULL);
-  loadCCMap (m, "whirl.drum.acceleration", 38, m->ctrlUseA, NULL, NULL);
-  loadCCMap (m, "whirl.drum.deceleration", 39, m->ctrlUseA, NULL, NULL);
-#endif
 }
 
 /*
@@ -1008,9 +996,9 @@ int midiConfig (void *mcfg, ConfigContext * cfg) {
 					 -127, 127)) == 1) {
     m->nshA_U = v;
   }
-  else if (strncasecmp (cfg->name, "midi.controller.reset", 21) == 0) {
+  else if (strncasecmp (cfg->name, "midi.controller.reset", 21) == 0 && cfg->value && strlen(cfg->value) > 0) {
     ack++;
-    if (atoi(cfg->name+21)) {
+    if (atoi(cfg->value)) {
       clearControllerMapping(m);
     }
   }
@@ -1077,28 +1065,6 @@ int midiConfig (void *mcfg, ConfigContext * cfg) {
   return ack;
 }
 
-static const ConfigDoc doc[] = {
-  {"midi.upper.channel", CFG_INT, "1", "The MIDI channel to use for the upper-manual. range: [1..16]"},
-  {"midi.lower.channel", CFG_INT, "2", "The MIDI channel to use for the lower manual. range: [1..16]"},
-  {"midi.pedals.channel", CFG_INT,"3", "The MIDI channel to use for the pedals. range: [1..16]"},
-  {"midi.controller.reset", CFG_INT, "\"-\"", "Clear existing CC mapping for all controllers (if non-zero argument is given). See also -D option."},
-  {"midi.controller.upper.<cc>", CFG_TEXT, "\"-\"", "Speficy a function-name to bind to the given MIDI control-command. <cc> is an integer 0..127. Defaults are in midiPrimeControllerMapping() and can be listed using the '-d' commandline option. See general information."},
-  {"midi.controller.lower.<cc>", CFG_TEXT, "\"-\"", "see midi.controller.upper"},
-  {"midi.controller.pedals.<cc>", CFG_TEXT, "\"-\"", "see midi.controller.upper"},
-  {"midi.transpose", CFG_INT, "0", "global transpose (noteshift) in semitones."},
-  {"midi.upper.transpose", CFG_INT, "0", "shift/transpose MIDI-notes on upper-manual in semitones"},
-  {"midi.lower.transpose", CFG_INT, "0", "shift/transpose MIDI-notes on lower-manual in semitones"},
-  {"midi.pedals.transpose", CFG_INT, "0", "shift/transpose MIDI-notes on pedals in semitones"},
-  {"midi.upper.transpose.split", CFG_INT, "0", "noteshift for upper manual in split mode"},
-  {"midi.lower.transpose.split", CFG_INT, "0", "noteshift for lower manual in split mode"},
-  {"midi.pedals.transpose.split", CFG_INT, "0", "noteshift for lower manual in split mode"},
-  {NULL}
-};
-
-const ConfigDoc *midiDoc () {
-  return doc;
-}
-
 void initMidiTables(void *mcfg) {
   struct b_midicfg * m = (struct b_midicfg *) mcfg;
   loadKeyTableA (m);
@@ -1107,7 +1073,7 @@ void initMidiTables(void *mcfg) {
   loadStatusTable (m);
 }
 
-static void remember_dynamic_CC_change(void *instp, int chn, int param, int fnid) {
+static void remember_dynamic_CC_change(void *instp, int chn, int param, int fnid, midiccflags_t flags) {
   struct b_instance * inst = (struct b_instance *) instp;
   struct b_midicfg * m = (struct b_midicfg *) inst->midicfg;
   char rckey[32];
@@ -1117,13 +1083,34 @@ static void remember_dynamic_CC_change(void *instp, int chn, int param, int fnid
   sprintf(rckey, "midi.controller.%s.%d",
       chn == m->rcvChA ? "upper" : (chn == m->rcvChB ? "lower" : "pedals"), param);
   cfg.name = rckey;
-  if (fnid < 0)
-    cfg.value = "unmap";
-  else
-    cfg.value = ccFuncNames[fnid];
+  char value[64];
+  if (fnid < 0) {
+    strcpy(value, "unmap");
+  }
+  else {
+    assert(strlen(ccFuncNames[fnid]) < 63);
+    strcpy(value, ccFuncNames[fnid]);
+    if (flags & MFLAG_INV) {
+      strcat(value, "-");
+    }
+  }
+
+  cfg.value = value;
   rc_add_cfg(inst->state, &cfg);
 }
 
+static unsigned char map_to_real_key(struct b_midicfg * m, const unsigned char channel, const unsigned char note) {
+  if (channel == m->rcvChA && note >= 36 && note < 97 ) {
+    return note - 36;
+  }
+  if (channel == m->rcvChB && note >= 36 && note < 97 ) {
+    return 64 + note - 36;
+  }
+  if (channel == m->rcvChC && note >= 24 && note < 50 ) {
+    return 128 + note - 24;
+  }
+  return 255;
+}
 
 void process_midi_event(void *instp, const struct bmidi_event_t *ev) {
   struct b_instance * inst = (struct b_instance *) instp;
@@ -1132,15 +1119,21 @@ void process_midi_event(void *instp, const struct bmidi_event_t *ev) {
     case NOTE_ON:
       if(m->keyTable[ev->channel] && m->keyTable[ev->channel][ev->d.tone.note] != 255) {
 	if (ev->d.tone.velocity > 0){
-	  oscKeyOn (inst->synth, m->keyTable[ev->channel][ev->d.tone.note]);
+	  oscKeyOn (inst->synth, m->keyTable[ev->channel][ev->d.tone.note],
+	      map_to_real_key(m, ev->channel, ev->d.tone.note)
+	      );
 	} else {
-	  oscKeyOff (inst->synth, m->keyTable[ev->channel][ev->d.tone.note]);
+	  oscKeyOff (inst->synth, m->keyTable[ev->channel][ev->d.tone.note],
+	      map_to_real_key(m, ev->channel, ev->d.tone.note)
+	      );
 	}
       }
       break;
     case NOTE_OFF:
       if(m->keyTable[ev->channel] && m->keyTable[ev->channel][ev->d.tone.note] != 255)
-	oscKeyOff (inst->synth, m->keyTable[ev->channel][ev->d.tone.note]);
+	oscKeyOff (inst->synth, m->keyTable[ev->channel][ev->d.tone.note],
+	    map_to_real_key(m, ev->channel, ev->d.tone.note)
+	    );
       break;
     case PROGRAM_CHANGE:
       installProgram(inst, ev->d.control.value);
@@ -1185,7 +1178,7 @@ void process_midi_event(void *instp, const struct bmidi_event_t *ev) {
 	/* Midi panic: 120: all sound off, 123: all notes off*/
 	int i;
 	for (i=0; i < MAX_KEYS; ++i) {
-	  oscKeyOff (inst->synth, i);
+	  oscKeyOff (inst->synth, i, i);
 	}
 	break;
       } else
@@ -1210,7 +1203,7 @@ void process_midi_event(void *instp, const struct bmidi_event_t *ev) {
 	  // unassign functions from this controller
 	  if (m->ctrlvec[ev->channel] && m->ctrlvec[ev->channel][ev->d.control.param].fn) {
 	    if (!remove_CC_map(m, ev->channel, ev->d.control.param)) {
-	      remember_dynamic_CC_change(instp, ev->channel, ev->d.control.param, -1);
+	      remember_dynamic_CC_change(instp, ev->channel, ev->d.control.param, -1, 0);
 	    }
 	  }
 
@@ -1221,9 +1214,10 @@ void process_midi_event(void *instp, const struct bmidi_event_t *ev) {
 	  m->ctrlvec[ev->channel][ev->d.control.param].mm = NULL;
 
 	  reverse_cc_map(m, fnid, ev->channel, ev->d.control.param);
-	  m->ctrlflg[ev->channel][ev->d.control.param] = (m->ccuimap&0xff00) >> 16;
+	  const midiccflags_t flags = (m->ccuimap&0xff0000) >> 16;
+	  m->ctrlflg[ev->channel][ev->d.control.param] = flags;
 
-	  remember_dynamic_CC_change(instp, ev->channel, ev->d.control.param, fnid);
+	  remember_dynamic_CC_change(instp, ev->channel, ev->d.control.param, fnid, flags);
 
 	  // send feedback to GUI..
 	  if (m->hookfn) {
@@ -1327,9 +1321,12 @@ void listCCAssignments(void *mcfg, FILE * fp) {
   dumpCCAssigment(fp, m->ctrlUseC, m->ctrlflg[m->rcvChC]);
 }
 
-void midi_uiassign_cc (void *mcfg, const char *fname) {
+void midi_uiassign_cc (void *mcfg, const char *fname, midiccflags_t flags) {
   struct b_midicfg * m = (struct b_midicfg *) mcfg;
   m->ccuimap = getCCFunctionId(fname);
+  if (m->ccuimap >= 0) {
+    m->ccuimap |= (flags & 0xff) << 16;
+  }
 }
 
 static void midi_print_cc_cb(const char *fnname, const unsigned char chn, const unsigned char cc, const unsigned char flags, void *arg) {
@@ -1364,6 +1361,32 @@ void listCCAssignments2(void *mcfg, FILE * fp) {
   fprintf(fp," Chn  CC  | Function [Mod]\n");
   fprintf(fp," ---------+---------------\n");
   midi_loopCCAssignment(mcfg, 7, midi_print_cc_cb, fp);
+}
+
+#else
+# include "cfgParser.h"
+#endif // CONFIGDOCONLY
+
+static const ConfigDoc doc[] = {
+  {"midi.upper.channel", CFG_INT, "1", "The MIDI channel to use for the upper-manual. range: [1..16]", INCOMPLETE_DOC},
+  {"midi.lower.channel", CFG_INT, "2", "The MIDI channel to use for the lower manual. range: [1..16]", INCOMPLETE_DOC},
+  {"midi.pedals.channel", CFG_INT,"3", "The MIDI channel to use for the pedals. range: [1..16]", INCOMPLETE_DOC},
+  {"midi.controller.reset", CFG_INT, "\"-\"", "Clear existing CC mapping for all controllers (if non-zero argument is given). See also -D option.", INCOMPLETE_DOC},
+  {"midi.controller.upper.<cc>", CFG_TEXT, "\"-\"", "Speficy a function-name to bind to the given MIDI control-command. <cc> is an integer 0..127. Defaults are in midiPrimeControllerMapping() and can be listed using the '-d' commandline option. See general information.", INCOMPLETE_DOC},
+  {"midi.controller.lower.<cc>", CFG_TEXT, "\"-\"", "see midi.controller.upper", INCOMPLETE_DOC},
+  {"midi.controller.pedals.<cc>", CFG_TEXT, "\"-\"", "see midi.controller.upper", INCOMPLETE_DOC},
+  {"midi.transpose", CFG_INT, "0", "Global transpose (noteshift) in semitones.", "semitones", -127, 127, 1},
+  {"midi.upper.transpose", CFG_INT, "0", "Shift/transpose MIDI-notes on upper-manual", "semitones", -127, 127, 1},
+  {"midi.lower.transpose", CFG_INT, "0", "Shift/transpose MIDI-notes on lower-manual", "semitones", -127, 127, 1},
+  {"midi.pedals.transpose", CFG_INT, "0", "Shift/transpose MIDI-notes on pedals", "semitones", -127, 127, 1},
+  {"midi.upper.transpose.split", CFG_INT, "0", "Noteshift for upper manual in split mode", "semitones", -127, 127, 1},
+  {"midi.lower.transpose.split", CFG_INT, "0", "Noteshift for lower manual in split mode", "semitones", -127, 127, 1},
+  {"midi.pedals.transpose.split", CFG_INT, "0", "Noteshift for lower manual in split mode", "semitones", -127, 127, 1},
+  DOC_SENTINEL
+};
+
+const ConfigDoc *midiDoc () {
+  return doc;
 }
 
 /* vi:set ts=8 sts=2 sw=2: */

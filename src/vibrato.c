@@ -1,7 +1,7 @@
 /* setBfree - DSP tonewheel organ
  *
  * Copyright (C) 2003-2004 Fredrik Kilander <fk@dsv.su.se>
- * Copyright (C) 2008-2012 Robin Gareus <robin@gareus.org>
+ * Copyright (C) 2008-2015 Robin Gareus <robin@gareus.org>
  * Copyright (C) 2012 Will Panther <pantherb@setbfree.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -29,6 +29,8 @@
  * 04-apr-2004/FK This must be the oldest piece of code that remains.
  *                Added MIDI controller support and edited some comments.
  */
+#ifndef CONFIGDOCONLY
+
 #define _XOPEN_SOURCE 700
 
 #include <stdio.h>
@@ -173,6 +175,16 @@ static void setVibratoRoutingFromMIDI (void *t, unsigned char uc) {
   }
 }
 
+static void setVibratoUpperFromMIDI (void *t, unsigned char uc) {
+  struct b_tonegen * inst_synth = (struct b_tonegen *) t;
+  setVibratoUpper (inst_synth, uc < 64 ? FALSE : TRUE);
+}
+
+static void setVibratoLowerFromMIDI (void *t, unsigned char uc) {
+  struct b_tonegen * inst_synth = (struct b_tonegen *) t;
+  setVibratoLower (inst_synth, uc < 64 ? FALSE : TRUE);
+}
+
 /*
  * Initialises tables.
  */
@@ -265,6 +277,8 @@ void initVibrato (void *t, void *m) {
   setVibrato (t, 0);
   useMIDIControlFunction (m, "vibrato.knob", setVibratoFromMIDI, t);
   useMIDIControlFunction (m, "vibrato.routing", setVibratoRoutingFromMIDI, t);
+  useMIDIControlFunction (m, "vibrato.upper", setVibratoUpperFromMIDI, t);
+  useMIDIControlFunction (m, "vibrato.lower", setVibratoLowerFromMIDI, t);
 }
 
 /*
@@ -294,18 +308,6 @@ int scannerConfig (void *t, ConfigContext * cfg) {
 					 0.0, 12.0)) == 1) {}
   return ack;
 } /* scannerConfig */
-
-static const ConfigDoc doc[] = {
-  {"scanner.hz", CFG_DOUBLE, "7.25", "range: [4..22]"},
-  {"scanner.modulation.v1", CFG_DOUBLE, "3.0", "range: [0..12]"},
-  {"scanner.modulation.v2", CFG_DOUBLE, "6.0", "range: [0..12]"},
-  {"scanner.modulation.v3", CFG_DOUBLE, "9.0", "range: [0..12]"},
-  {NULL}
-};
-
-const ConfigDoc *scannerDoc () {
-  return doc;
-}
 
 /*
  * Floating-point version of vibrato scanner.
@@ -356,6 +358,22 @@ float * vibratoProc (struct b_vibrato* v, float * inbuffer, float * outbuffer, s
   }
 
   return outbuffer;
+}
+
+#else
+# include "cfgParser.h"
+#endif // CONFIGDOCONLY
+
+static const ConfigDoc doc[] = {
+  {"scanner.hz",            CFG_DOUBLE, "7.25", "Frequency of the vibrato scanner", "Hz", 4, 22, .5},
+  {"scanner.modulation.v1", CFG_DOUBLE, "3.0",  "Amount of modulation for vibrato/chorus 1 setting", "Hz", 0, 12, .5},
+  {"scanner.modulation.v2", CFG_DOUBLE, "6.0",  "Amount of modulation for vibrato/chorus 2 setting", "Hz", 0, 12, .5},
+  {"scanner.modulation.v3", CFG_DOUBLE, "9.0",  "Amount of modulation for vibrato/chorus 3 setting", "Hz", 0, 12, .5},
+  DOC_SENTINEL
+};
+
+const ConfigDoc *scannerDoc () {
+  return doc;
 }
 
 /* vi:set ts=8 sts=2 sw=2: */

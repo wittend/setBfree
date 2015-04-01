@@ -1,7 +1,7 @@
 /* setBfree - DSP tonewheel organ
  *
  * Copyright (C) 2003-2004 Fredrik Kilander <fk@dsv.su.se>
- * Copyright (C) 2008-2012 Robin Gareus <robin@gareus.org>
+ * Copyright (C) 2008-2015 Robin Gareus <robin@gareus.org>
  * Copyright (C) 2012 Will Panther <pantherb@setbfree.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -29,6 +29,7 @@
  *
  * Manager for program change.
  */
+#ifndef CONFIGDOCONLY
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -866,15 +867,6 @@ int pgmConfig (struct b_programme *p, ConfigContext * cfg) {
 }
 #endif
 
-static const ConfigDoc doc[] = {
-  {"pgm.controller.offset", CFG_INT, "1", "Compensate for MIDI controllers that number the programs from 1 to 128. Internally we use 0-127, as does MIDI. range: [0,1]"},
-  {NULL}
-};
-
-const ConfigDoc *pgmDoc () {
-  return doc;
-}
-
 
 #define MAXROWS 18
 #define MAXCOLS  4
@@ -1151,13 +1143,22 @@ void writeProgramm(int pgmNr, Programme *p, const char *sep, FILE * fp) {
     format_drawbars(p->drawbars, tmp);
     fprintf(fp, "%s, drawbarsupper=\"%s\"", sep, tmp);
   }
+  else if ((p->flags[0] & FL_DRAWBR) && (p->flags[0] & FL_DRWRND)) {
+    fprintf(fp, "%s, drawbarsupper=random", sep);
+  }
   if ((p->flags[0] & FL_LOWDRW) && !(p->flags[0] & FL_DRWRND)) {
     format_drawbars(p->lowerDrawbars, tmp);
     fprintf(fp, "%s, drawbarslower=\"%s\"", sep, tmp);
   }
+  else if ((p->flags[0] & FL_LOWDRW) && (p->flags[0] & FL_DRWRND)) {
+    fprintf(fp, "%s, drawbarslower=random", sep);
+  }
   if ((p->flags[0] & FL_PDLDRW) && !(p->flags[0] & FL_DRWRND)) {
     format_drawbars(p->pedalDrawbars, tmp);
     fprintf(fp, "%s, drawbarspedals=\"%s\"", sep, tmp);
+  }
+  else if ((p->flags[0] & FL_PDLDRW) && (p->flags[0] & FL_DRWRND)) {
+    fprintf(fp, "%s, drawbarspedals=random", sep);
   }
   if (p->flags[0] & FL_SCANNR) {
     int knob = ((p->scanner & 0xf) << 1) - ((p->scanner & CHO_) ? 1 : 2);
@@ -1290,4 +1291,20 @@ int main (int argc, char **argv) {
   return 0;
 }
 #endif
+
+#else
+# include "cfgParser.h"
+#endif // CONFIGDOCONLY
+
+static const ConfigDoc doc[] = {
+  {"pgm.controller.offset", CFG_INT, "1", "Compensate for MIDI controllers that number the programs from 1 to 128. Internally we use 0-127, as does MIDI. range: [0,1]", INCOMPLETE_DOC},
+  DOC_SENTINEL
+};
+
+const ConfigDoc *pgmDoc () {
+  return doc;
+}
+
+
+
 /* vi:set ts=8 sts=2 sw=2: */

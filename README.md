@@ -15,34 +15,10 @@ Hammond and Don Leslie.
 Quick-start
 -----------
 
- - start jackd [http://jackaudio.org] or configure JACK autostart
- - run `setBfree-start`
- - connect JACK Audio/MIDI ports (using qjackctl or you favorite JACK
-   connection manager -- note: enable JACK-MIDI or use `a2jmidid` to expose
-	 MIDI-devices to JACK, alternatively run `setBfree midi.driver=alsa`)
-
-
-About
------
-
-setBfree is based on the code of Fredrik Kilander's Beatrix organ emulator. He
-gave permission to Will to use the Beatrix code in a GPL app. Robin Gareus
-changed the OSS based code to a JACK interface and moved the overdrive, reverb,
-and leslie functionality into LV2 plugins. The LV2 plugins allow users to mix
-and match any of the components with any other JACK supported app. Robin also
-added a TCL/TK GUI for testing and added leslie cabinet simulation using Ken
-Restivo's IR sample.
-
-While this works now in its first beta release, we are using this as a starting
-point for building a high quality emulator players familiar with the great
-Hammond organs of the past will enjoy. There will be two major milestones to
-reach this goal. The first is to clean up its first beta functionality
-including improving and cleaning up the current code, and adding a slicker GUI
-interface. For the second milestone, we will modify much of the code to make
-the organ more dynamic. A user will be able to adjust to taste from the 'like a
-bird' quality of chill players to the knocking, screaming organ sounds of
-gospel vamps, and rock and roll.
-
+ - start jackd (see http://jackaudio.org, more below)
+ - run `setBfreeUI` for the GUI version
+ - run `setBfree` for the headless commandline application
+ - or load the LV2 plugin "setBfree DSP Tonewheel Organ" in your favorite DAW
 
 Usage
 -----
@@ -54,15 +30,18 @@ lengthy list of available options and properties than can be modified.
 or ALSA-sequencer) and outputs audio to JACK. The engine does not have any
 graphical user interface (GUI). It is usually started from the commandline.
 
-The GUI `vb3kb` is a standalone application that simply sends MIDI messages to
-setBfree. `setBfree-start` is a shell-script that launches both and connects
-the GUI to the synth.
+The GUI `setBfreeUI` is a standalone application that wraps the LV2 plugin.
+It provides both visual feedback about the current synth state as well as allows
+to reconfigure and control numerous aspects of the organ.
+
+The organ itself, as well as broken out parts (leslie, reverv, overdrive) are
+available as LV2 plugins.
 
 Examples:
 
-	setBfree midi.driver="alsa" midi.port="129" jack.connect="jack_rack:in_"
 	setBfree jack.out.left="system:playback_7" jack.out.left="system:playback_8"
-	setBfree-start midi.driver="alsa"
+	setBfreeUI
+	jalv.gtk http://gareus.org/oss/lv2/b_synth # LV2 in jalv-host
 
 
 Getting started - standalone app
@@ -70,21 +49,12 @@ Getting started - standalone app
 
 You'll want reliable, low-latency, real-time audio. Therefore you want
 [JACK](http://jackaudio.org/). On GNU/Linux we recommend `qjackctl` to start the
-jack-audio-server, on OSX jack comes with a GUI called JACK-pilot.
+jack-audio-server, on OSX jack comes with a GUI called JACK-pilot. On Windows use the
+Jack Control GUI.
 
-To be continued..
-
-*   http://qjackctl.sf.net/
-*   http://jackaudio.org/faq
-*   aim for low-latency (256 frames/period or less) - except if you are church
-		organist, whom we believe are awesome latency-compensation organic systems
-*   http://home.gna.org/a2jmidid/
-
-
-Getting started - LV2 plugins
------------------------------
-
-To be continued..
+An excellent tutorial to get started with JACK can be found on the
+[libremusicproduction](http://libremusicproduction.com/articles/demystifying-jack-%E2%80%93-beginners-guide-getting-started-jack)
+website.
 
 
 Internal Signal Flow
@@ -135,10 +105,13 @@ generation itself and can not be broken-out to standalone effects.
 Summary of Changes since Beatrix
 --------------------------------
 
-*   native JACK application (JACK Audio, JACK or ALSA MIDI in)
+*   native JACK application (JACK Audio, JACK MIDI)
 *   synth engine: variable sample-rate, floating point (beatrix is 22050 Hz, 16bit only)
 *   broken-out effects as LV2 plugins; LV2 wrapper around synth-engine
 *   built-in documentation
+*   Graphical User Interface, with MIDI-feedback and dynamically bound MIDI-CC
+*   state save/restore
+*   numerous bug fixes
 
 see the ChangeLog and git log for details.
 
@@ -148,44 +121,39 @@ Compile
 
 Install the dependencies and simply call `make` followed by `sudo make install`.
 
-*   libjack-dev - **required** - http://jackaudio.org/ - used for audio I/O
-*   tcl-dev, tk-dev - optional, recommended - http://tcl.sf.net/ - virtual Keyboard GUI
-*   libasound2-dev - optional, recommended - ALSA MIDI
-*   lv2-dev - optional, recommended - build effects as LV2 plugins
-*   libftgl-dev, libglu1-mesa-dev, ttf-bitstream-vera - optional, recommended for the LV2 GUI
-*   libzita-convolver-dev - optional - IR leslie cabinet-emulation
-*   libsndfile1-dev - optional - needed to load IR samples for zita-convolver
-*   liblo-dev - optional - http://opensoundcontrol.org/ - used only in standalone preamp/overdrive app.
+*   libjack-dev - **required** - [JACK](http://jackaudio.org/) is used for audio and MIDI I/O
+*   libftgl-dev, libglu1-mesa-dev, ttf-bitstream-vera - optional, **recommended** - openGL GUI
+*   lv2-dev - optional, **recommended** - [LV2](http://lv2plug.in/) plugins and GUI
+*   libzita-convolver-dev - optional - [libzita-convolver](http://kokkinizita.linuxaudio.org/linuxaudio/downloads/index.html) is used for cabinet-emulation
+*   libsndfile1-dev - optional - [libsndfile](http://www.mega-nerd.com/libsndfile/) is needed to load IR samples for zita-convolver
+*   liblo-dev - optional - [OSC](http://opensoundcontrol.org/) used only in standalone preamp/overdrive app.
+*   libasound2-dev - optional - ALSA MIDI
 *   help2man - optional - re-create the man pages
 *   doxygen - optional - create source-code annotations
 
 
-If zita-convolver and libsndfile1-dev are available you can use
+If zita-convolver and libsndfile1-dev are available one can use
 
 	make clean
 	make ENABLE_CONVOLUTION=yes
 
-to enable experimental built-in convolution reverb used for leslie cabinet
-simulation (at some point down the road this will be enabled the default).
+to enable additional leslie cabinet simulation.
+This is an additional optional post-processing step and not related to the 
+leslie doppler and built-in angular-dependent leslie speaker emulation.
 
+As for version 0.8, alsa-sequencer support is deprecated and no longer enabled by
+default (even if libasound is found), It is still available via `ENABLE_ALSA=yes`.
 
-The Makefile understands PREFIX and DESTDIR variables:
+The Makefile understands PREFIX and DESTDIR variables: e.g.
 
 	make clean
-	make ENABLE_CONVOLUTION=yes PREFIX=/usr
-	make install ENABLE_CONVOLUTION=yes PREFIX=/usr DESTDIR=mypackage/setbfree/
+	make ENABLE_CONVOLUTION=yes PREFIX=/usr ENABLE_ALSA=yes
+	make install ENABLE_CONVOLUTION=yes ENABLE_ALSA=yes PREFIX=/usr DESTDIR=mypackage/setbfree/
 
 **Packagers**: see debian/rules in the git-repository. LDFLAGS can be passed as is,
 CFLAGS should be specified by overriding the OPTIMIZATIONS variable.
 The packaging also includes a desktop-file to launch setBfree from the
 application-menu which is not included in the release.
-
-**Mac/OSX**: The same instructions apply. Tcl/Tk is included with OSX. The JackOSX
-packages available from jackaudio.org provide neccesary header and development
-files. The setBfree git-repository includes a script to build universal binary
-and create a DMG.  However this script assumes that universal (PPC, i386,
-x86-64) versions of the JACK-libraries as well as zita-convolver and libsndfile
-are available in /usr/local/ on the build-host.
 
 Thanks
 ------

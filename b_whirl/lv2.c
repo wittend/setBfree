@@ -139,7 +139,7 @@ instantiate(const LV2_Descriptor*     descriptor,
   b3w->_w = 2000.0 / rate;
   b3w->o_horn_level = 1.0;
   b3w->o_drum_level = 1.0;
-  b3w->o_drum_width = 1.0;
+  b3w->o_drum_width = 0.0;
 
   return (LV2_Handle)b3w;
 }
@@ -295,7 +295,7 @@ run(LV2_Handle instance, uint32_t n_samples)
   SETPARAM(fsetDrumFilterQ, filtd_qual, )
   SETPARAM(fsetDrumFilterGain, filtd_gain, )
 
-  SETVALUE(hnBreakPos, horn_brake, (double), )
+  SETVALUE(hnBrakePos, horn_brake, (double), )
   SETVALUE(hornAcc, horn_accel, , )
   SETVALUE(hornDec, horn_decel, , )
 
@@ -306,7 +306,7 @@ run(LV2_Handle instance, uint32_t n_samples)
 
   SETPARAM(useRevOption, rev_select, (int) floorf)
 
-  SETVALUE(drBreakPos, drum_brake, (double), )
+  SETVALUE(drBrakePos, drum_brake, (double), )
   SETVALUE(drumAcc, drum_accel, , )
   SETVALUE(drumDec, drum_decel, , )
 
@@ -314,21 +314,25 @@ run(LV2_Handle instance, uint32_t n_samples)
 
   const float hl = db_to_coefficient(*b3w->horn_level);
   const float dl = db_to_coefficient(*b3w->drum_level);
-  const float dw = *b3w->drum_width;
+  const float dw = *b3w->drum_width - 1.f;
   const float _w = b3w->_w; // TODO * pow n_samples
 
   b3w->o_horn_level += _w * (hl - b3w->o_horn_level) + 1e-15;
   b3w->o_drum_level += _w * (dl - b3w->o_drum_level) + 1e-15;
+
   b3w->o_drum_width += _w * (dw - b3w->o_drum_width) + 1e-15;
 
-  const float dw2 = b3w->o_drum_width / 2.0;
+  const float dwF = b3w->o_drum_width;
+  const float dwP = dwF > 0.f ? (dwF >  1.f ? 1.f :  dwF) : 0.f;
+  const float dwN = dwF < 0.f ? (dwF < -1.f ? 1.f : -dwF) : 0.f;
+
+  const float dll = b3w->o_drum_level * (1.f - dwP);
+  const float dlr = b3w->o_drum_level * (0.f + dwP);
+  const float drl = b3w->o_drum_level * (0.f + dwN);
+  const float drr = b3w->o_drum_level * (1.f - dwN);
 
   const float hll = b3w->o_horn_level;
   const float hrr = b3w->o_horn_level;
-  const float dll = b3w->o_drum_level * (.5 + dw2);
-  const float dlr = b3w->o_drum_level * (.5 - dw2);
-  const float drl = b3w->o_drum_level * (.5 - dw2);
-  const float drr = b3w->o_drum_level * (.5 + dw2);
 
   for (i=0; i < n_samples; ++i) {
     outL[i] = b3w->bufH[0][i] * hll + b3w->bufD[0][i] * dll + b3w->bufD[1][i] * dlr;
@@ -376,6 +380,14 @@ static const LV2_Descriptor descriptorExt = {
   cleanup,
   extension_data
 };
+
+// fix for -fvisibility=hidden
+#undef LV2_SYMBOL_EXPORT
+#ifdef _WIN32
+#    define LV2_SYMBOL_EXPORT __declspec(dllexport)
+#else
+#    define LV2_SYMBOL_EXPORT  __attribute__ ((visibility ("default")))
+#endif
 
 LV2_SYMBOL_EXPORT
 const LV2_Descriptor*

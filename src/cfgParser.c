@@ -1,7 +1,7 @@
 /* setBfree - DSP tonewheel organ
  *
  * Copyright (C) 2003-2004 Fredrik Kilander <fk@dsv.su.se>
- * Copyright (C) 2008-2012 Robin Gareus <robin@gareus.org>
+ * Copyright (C) 2008-2015 Robin Gareus <robin@gareus.org>
  * Copyright (C) 2012 Will Panther <pantherb@setbfree.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -36,6 +36,7 @@
 
 #include "main.h"
 #include "global_inst.h"
+#include "pgmParser.h"
 
 #ifdef HAVE_ZITACONVOLVE
 #include "convolution.h"
@@ -137,6 +138,9 @@ void parseConfigurationLine (void *inst, const char * fname, int lineNumber, cha
     if (strcasecmp (name, "config.read") == 0) {
       parseConfigurationFile (inst, value);
     }
+    else if (strcasecmp (name, "program.read") == 0) {
+      loadProgrammeFile (((b_instance*)inst)->progs, value);
+    }
     else {
       ConfigContext cfg;
       cfg.fname  = fname;
@@ -159,7 +163,7 @@ int evaluateConfigKeyValue(void *inst, const char *key, const char *value) {
 
 #ifndef CFG_MAIN
 /* text representation of enum conftype */
-const char *conftypenames[CFG_LAST] = { "S", "D", "F", "I" };
+const char *conftypenames[CFG_LAST] = { "S", "D", "D", "F", "I" };
 
 /*
  *
@@ -251,6 +255,10 @@ void dumpConfigDoc () {
   "   <22:vibrato1, <44:chorus1, <66:vibrato2, <88:chorus2, <110vibrato3, >=110:chorus3\n"
   "  vibrato.routing                            I* (0)\n"
   "    <32:off, <64:lower, <96:upper, >=96:both\n"
+  "  vibrato.upper                              I* (0)\n"
+  "    <64:off, >=64 on                        \n"
+  "  vibrato.lower                              I* (0)\n"
+  "    <64:off, >=64 on                        \n"
   "  percussion.enable                          I* (0)\n"
   "    <16:off, <63:normal, <112:soft, >=112:off\n"
   "  percussion.decay                           I* (0)\n"

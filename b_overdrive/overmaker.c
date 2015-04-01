@@ -1520,35 +1520,43 @@ void legacyConfig () {
   codeln ("return rtn;");
   popIndent ();
   codeln ("}");
+  vspace (1);
+}
+
+void writeDocumentation () {
+  codeln ("#else // no CONFIGDOCONLY");
+  codeln ("# include \"cfgParser.h\"");
+  codeln ("#endif");
+
   vspace (2);
   codeln ("static const ConfigDoc doc[] = {");
   pushIndent ();
-  codeln ("{\"overdrive.inputgain\", CFG_FLOAT, \"0.3567\", \"This is how much the input signal is scaled as it enters the overdrive effect. The default value is quite hot, but you can of course try it in anyway you like; range [0..1]\"},");
-  codeln ("{\"overdrive.outputgain\", CFG_FLOAT, \"0.07873\", \"This is how much the signal is scaled as it leaves the overdrive effect. Essentially this value should be as high as possible without clipping (and you *will* notice when it does - Test with a bass-chord on 88 8888 000 with percussion enabled and full swell, but do turn down the amplifier/headphone volume first!); range [0..1]\"},");
+  codeln ("{\"overdrive.inputgain\", CFG_FLOAT, \"0.3567\", \"This is how much the input signal is scaled as it enters the overdrive effect. The default value is quite hot, but you can of course try it in anyway you like; range [0..1]\", INCOMPLETE_DOC},");
+  codeln ("{\"overdrive.outputgain\", CFG_FLOAT, \"0.07873\", \"This is how much the signal is scaled as it leaves the overdrive effect. Essentially this value should be as high as possible without clipping (and you *will* notice when it does - Test with a bass-chord on 88 8888 000 with percussion enabled and full swell, but do turn down the amplifier/headphone volume first!); range [0..1]\", INCOMPLETE_DOC},");
 #ifdef TR_BIASED
-  codeln ("{\"xov.ctl_biased\", CFG_FLOAT, \"0.5347\", \"bias base; range [0..1]\"},");
+  codeln ("{\"xov.ctl_biased\", CFG_FLOAT, \"0.5347\", \"bias base; range [0..1]\", INCOMPLETE_DOC},");
 #endif
 #ifdef ADWS_GFB
-  codeln ("{\"xov.ctl_biased_gfb\", CFG_FLOAT, \"0.6214\", \"Global [negative] feedback control; range [0..1]\"},");
+  codeln ("{\"xov.ctl_biased_gfb\", CFG_FLOAT, \"0.6214\", \"Global [negative] feedback control; range [0..1]\", INCOMPLETE_DOC},");
 #endif
 #ifdef CLEAN_MIX
-  codeln ("{\"xov...\", CFG_FLOAT, \"\", \"\"},"); // TODO - unused in overmakerdefs.h
+  codeln ("{\"xov...\", CFG_FLOAT, \"\", \"\", INCOMPLETE_DOC},"); // TODO - unused in overmakerdefs.h
 #endif
 #ifdef PRE_DC_OFFSET
-  codeln ("{\"xov...\", CFG_FLOAT, \"\", \"\"},"); // TODO - unused in overmakerdefs.h
+  codeln ("{\"xov...\", CFG_FLOAT, \"\", \"\", INCOMPLETE_DOC},"); // TODO - unused in overmakerdefs.h
 #endif
 #ifdef INPUT_COMPRESS
-  codeln ("{\"xov...\", CFG_FLOAT, \"\", \"\"},"); // TODO - unused in overmakerdefs.h
+  codeln ("{\"xov...\", CFG_FLOAT, \"\", \"\", INCOMPLETE_DOC},"); // TODO - unused in overmakerdefs.h
 #endif
 #ifdef PRE_FILTER_TYPE
-  codeln ("{\"xov...\", CFG_FLOAT, \"\", \"\"},"); // TODO - unused in overmakerdefs.h
+  codeln ("{\"xov...\", CFG_FLOAT, \"\", \"\", INCOMPLETE_DOC},"); // TODO - unused in overmakerdefs.h
 #endif
 
-  codeln ("{\"overdrive.character\", CFG_FLOAT, \"-\", \"Abstraction to set xov.ctl_biased_fb and xov.ctl_biased_fb2\"},");
+  codeln ("{\"overdrive.character\", CFG_FLOAT, \"-\", \"Abstraction to set xov.ctl_biased_fb and xov.ctl_biased_fb2\", INCOMPLETE_DOC},");
   if (modvec[MOD_DOC].fn != NULL) {
     (modvec[MOD_DOC].fn)(0,NULL);
   }
-  codeln ("{NULL}");
+  codeln ("DOC_SENTINEL");
   popIndent ();
   codeln ("};");
   vspace (2);
@@ -1884,6 +1892,8 @@ void render (FILE * fp, char * funcName) {
 
   setOutputStream (fp);
 
+  codeln ("#ifndef CONFIGDOCONLY");
+
 #ifdef IPOL_FC
   computeIpolFilter (IPOL_FC, IPOL_WDW);
   sprintf (buf, "Interpolation filter at digital frequency %g", IPOL_FC);
@@ -1965,6 +1975,8 @@ void render (FILE * fp, char * funcName) {
 #endif /* INPUT_COMPRESS */
 
   legacyInit ();
+
+  writeDocumentation();
 
 }
 

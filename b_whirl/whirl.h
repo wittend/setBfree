@@ -26,11 +26,16 @@
 #include "../src/cfgParser.h" // ConfigContext
 #include "../src/midi.h" // useMIDIControlFunction
 
-#define WHIRL_DISPLC_SIZE ((unsigned int) (1 << 11))
+#define WHIRL_DISPLC_SIZE ((unsigned int) (1 << 14))
 #define WHIRL_DISPLC_MASK ((WHIRL_DISPLC_SIZE) - 1)
 
-#define WHIRL_BUF_SIZE_SAMPLES ((unsigned int) (1 << 11))
+#define WHIRL_BUF_SIZE_SAMPLES ((unsigned int) (1 << 10))
 #define WHIRL_BUF_MASK_SAMPLES (WHIRL_BUF_SIZE_SAMPLES - 1)
+
+#define AGBUF 8
+#define AGMASK (AGBUF-1)
+
+typedef float iir_t;
 
 typedef enum {a0, a1, a2, b0, b1, b2, z0, z1} filterCoeff;
 
@@ -45,8 +50,8 @@ struct b_whirl {
 
   double SampleRateD;
   int bypass;        ///< if set to 1 completely bypass this effect
-  double hnBreakPos; ///< where to stop horn - 0: free, 1.0: front-center, ]0..1] clockwise circle */
-  double drBreakPos; ///< where to stop drum
+  double hnBrakePos; ///< where to stop horn - 0: free, 1.0: front-center, ]0..1] clockwise circle */
+  double drBrakePos; ///< where to stop drum
 
 /*
  * Forward (clockwise) displacement table for writing positions.
@@ -62,9 +67,6 @@ struct b_whirl {
 
   struct _bw bfw[WHIRL_DISPLC_SIZE];
   struct _bw bbw[WHIRL_DISPLC_SIZE];
-
-#define AGBUF 512
-#define AGMASK (AGBUF-1)
 
   float adx0[AGBUF];
   float adx1[AGBUF];
@@ -111,8 +113,8 @@ struct b_whirl {
   int hornAcDc;
   int drumAcDc;
 
-  double hornIncrGRD; ///< current angular speed - unit: radians / sample / (2*M_PI)
-  double drumIncrGRD; ///< current angular speed - unit: radians / sample / (2*M_PI)
+  double hornIncr; ///< current angular speed - unit: radians / sample / (2*M_PI)
+  double drumIncr; ///< current angular speed - unit: radians / sample / (2*M_PI)
 
   double hornTarget; ///< target angular speed  - unit: radians / sample / (2*M_PI)
   double drumTarget; ///< target angular speed  - unit: radians / sample / (2*M_PI)
@@ -128,6 +130,8 @@ struct b_whirl {
 
   float airSpeed;	/* Meters per second */
   float micDistCm;	/* From mic to origin */
+  float hornXOffsetCm;	/* offset of horn, towards left mic */
+  float hornZOffsetCm;	/* offset of horn, perpendicular to mic to front */
   float drumSpacing[6];
 
 /* Delay buffers */
@@ -142,20 +146,20 @@ struct b_whirl {
   unsigned int outpos;
   float z[4];
 
-  float drfL[8];/* Drum filter */
-  float drfR[8];/* Drum filter */
+  iir_t  drfL[8];/* Drum filter */
+  iir_t  drfR[8];/* Drum filter */
   int    lpT;	/* high shelf */
   double lpF;	/* Frequency */
   double lpQ;	/* Q, bandwidth */
   double lpG;	/* Gain */
 
-  float hafw[8];		/* Horn filter a */
+  iir_t hafw[8]; /* Horn filter a */
   float haT; /* low pass */
   float haF; /* 3900.0; 25-nov-04 */
   float haQ; /*   1.4; 25-nov-04 */
   float haG; /*   0.0; 25-nov-04 */
 
-  float hbfw[8];
+  iir_t hbfw[8];
   float hbT;		/* low shelf */
   float hbF;
   float hbQ; /* 2.0; 25-nov-04 */

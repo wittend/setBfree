@@ -1,7 +1,7 @@
 /* setBfree - DSP tonewheel organ
  *
  * Copyright (C) 2003-2004 Fredrik Kilander <fk@dsv.su.se>
- * Copyright (C) 2008-2012 Robin Gareus <robin@gareus.org>
+ * Copyright (C) 2008-2015 Robin Gareus <robin@gareus.org>
  * Copyright (C) 2012 Will Panther <pantherb@setbfree.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -24,6 +24,8 @@
 #ifndef _CFGPARSER_H_
 #define _CFGPARSER_H_
 
+#include <stdio.h>
+
 /* some filters - in particular butterworth shelfing -
  * end up producing denormal-values when fed with zeros */
 #define DENORMAL_HACK (1e-14)
@@ -37,18 +39,25 @@ typedef struct _configContext {
 } ConfigContext;
 
 enum conftype {
-	CFG_TEXT = 0,
-	CFG_DOUBLE,
-	CFG_FLOAT,
-	CFG_INT,
-	CFG_LAST
+  CFG_TEXT = 0,
+  CFG_DOUBLE,
+  CFG_DECIBEL, // equivalent to double; only relevant for GUI-formatting and ui_step
+  CFG_FLOAT,
+  CFG_INT,
+  CFG_LAST
 };
+
+#define INCOMPLETE_DOC "", 0, 0, 0
+#define DOC_SENTINEL {NULL, CFG_TEXT, "", "", "", 0, 0, 0}
 
 typedef struct _configDoc {
   const char * name; /**< parameter name */
-	enum conftype type;
+  enum conftype type;
   char const * dflt; /**< default value as text */
   char const * desc; /**< descition */
+  char const * unit; /**< unit */
+  const float min, max; /**< min/max range where applicable or 0,0 for unbound */
+  const float ui_step;  /**< suggested step size for GUI */
 } ConfigDoc;
 
 void parseConfigurationLine (

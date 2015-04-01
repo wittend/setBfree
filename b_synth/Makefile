@@ -2,28 +2,7 @@ include ../common.mak
 
 LOADLIBES = -lm
 override CFLAGS+= -I../src -I../b_overdrive -I../b_reverb -I../b_whirl
-override CFLAGS+=`pkg-config --cflags lv2` -DLV2SYNTH
-
-ifeq ($(IS_OSX), yes)
-  FONTFILE?=/usr/X11/lib/X11/fonts/TTF/VeraBd.ttf
-else
-  FONTFILE?=/usr/share/fonts/truetype/ttf-bitstream-vera/VeraBd.ttf
-endif
-
-ifeq ($(shell test -f $(FONTFILE) || echo no ), no)
-  $(warning UI font can not be found on this system, install bitstream-vera TTF or set the FONTFILE variable to a ttf file)
-  $(warning LV2 GUI will not be built)
-  FONT_FOUND=no
-else
-  FONT_FOUND=yes
-endif
-
-ifeq ($(IS_OSX), yes)
-  HAVE_UI=$(shell pkg-config --exists ftgl && echo $(FONT_FOUND))
-else
-  HAVE_UI=$(shell pkg-config --exists glu ftgl && echo $(FONT_FOUND))
-endif
-
+override CFLAGS+=`pkg-config --cflags lv2` -DLV2SYNTH -fvisibility=hidden
 targets=
 
 LV2NAME=b_synth
@@ -32,53 +11,22 @@ TX=textures/
 
 ifeq ($(LV2AVAIL), yes)
   targets+=lv2
-
   ifeq ($(HAVE_UI), yes)
-    UICFLAGS=-I..
-    UIDEPS=../pugl/pugl.h ../pugl/pugl_internal.h ui_model.h
-    UIDEPS+=$(TX)drawbar.c $(TX)wood.c $(TX)dial.c
-    UIDEPS+=$(TX)btn_vibl.c $(TX)btn_vibu.c $(TX)btn_overdrive.c $(TX)btn_perc_volume.c
-    UIDEPS+=$(TX)btn_perc.c $(TX)btn_perc_decay.c $(TX)btn_perc_harmonic.c
-    UIDEPS+=$(TX)bg_right_ctrl.c $(TX)bg_left_ctrl.c $(TX)bg_leslie_drum.c $(TX)bg_leslie_horn.c
-    UIDEPS+=$(TX)help_screen_image.c
-    UIDEPS+=$(TX)ui_button_image.c $(TX)ui_proc_image.c
-    UIDEPS+=$(TX)uim_background.c $(TX)uim_cable1.c $(TX)uim_cable2.c $(TX)uim_caps.c
-    UIDEPS+=$(TX)uim_tube1.c $(TX)uim_tube2.c
-    ifeq ($(IS_OSX), yes)
-      UIDEPS+=../pugl/pugl_osx.m
-      UILIBS=../pugl/pugl_osx.m -framework Cocoa -framework OpenGL
-      UILIBS+=`pkg-config --variable=libdir ftgl`/libftgl.a `pkg-config --variable=libdir ftgl`/libfreetype.a
-      UILIBS+=-lm -lz -lbz2 --stdlib=libstdc++ -mmacosx-version-min=10.5
-      UI_TYPE=CocoaUI
-    else
-      UIDEPS+=../pugl/pugl_x11.c
-      override CFLAGS+=`pkg-config --cflags glu`
-      UILIBS=../pugl/pugl_x11.c -lX11 `pkg-config --libs glu ftgl`
-      UI_TYPE=X11UI
-    endif
-    override CFLAGS+=`pkg-config --cflags freetype2 ftgl` -DHAVE_FTGL
-    override CFLAGS+=-DFONTFILE=\"$(FONTFILE)\"
     targets+=$(LV2GUI)$(LIB_EXT)
   else
-    $(warning "openGL/GLU is not available - install glu-dev to include LV2 GUI")
+    $(warning "GUI will not be built")
+    $(warning "either openGL/GLU is not available - install glu-dev, ftgl-dev")
+    $(warning "or $(FONTFILE) cannot be found")
   endif
 endif
 
-#NOTE: midi.c and cfgParser.c needs to be re-compiled w/o HAVE_ASEQ
-# and HAVE_ZITACONVOLVE. Other objects are identical.
-OBJ= \
-  ../src/midi.c \
-  ../src/cfgParser.c \
-  ../src/program.c \
-  ../src/vibrato.c \
-  ../src/state.c \
-  ../src/tonegen.c \
-  ../src/pgmParser.c \
-  ../src/memstream.c \
-  ../b_whirl/eqcomp.c \
-  ../b_whirl/whirl.c \
-  ../b_overdrive/overdrive.c \
-  ../b_reverb/reverb.c \
+ifeq ($(IS_WIN)$(IS_OSX), yes)
+  CC=$(CXX)
+else
+  ifneq ($(ENABLE_CONVOLUTION), yes)
+    override CFLAGS+=-std=c99
+  endif
+endif
 
 all: $(targets)
 
@@ -96,16 +44,26 @@ ifeq ($(HAVE_UI), yes)
 	sed "s/@UI_TYPE@/$(UI_TYPE)/;s/@UI_REQ@/$(LV2UIREQ)/;" $(LV2NAME).ui.ttl.in >> $(LV2NAME).ttl
 endif
 
-$(LV2NAME)$(LIB_EXT): lv2.c $(OBJ) uris.h ../src/cfgParser.h ../src/midi.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) \
+$(LV2NAME)$(LIB_EXT): lv2.c $(LV2OBJ) uris.h ../src/cfgParser.h ../src/midi.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LIC_CFLAGS) \
 		-o $(LV2NAME)$(LIB_EXT) \
-		lv2.c $(OBJ) \
-	  -shared $(LV2LDFLAGS) $(LDFLAGS) $(LOADLIBES)
+		lv2.c $(LV2OBJ) \
+	  -shared $(LV2LDFLAGS) $(LDFLAGS) $(LOADLIBES) $(LIC_LOADLIBES)
 
-$(LV2GUI)$(LIB_EXT): ui.c uris.h $(UIDEPS)
+$(LV2GUI)$(LIB_EXT): ui.c uris.h $(UIDEPS) $(FONTFILE) $(LV2OBJ)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(UICFLAGS) \
-		-o $(LV2GUI)$(LIB_EXT) ui.c \
+		-o $(LV2GUI)$(LIB_EXT) ui.c -DCONFIGDOCONLY \
+		../src/midi.c \
+		../src/program.c \
+		../src/vibrato.c \
+		../src/tonegen.c \
+		../b_whirl/whirl.c \
+		../b_overdrive/overdrive.c \
+		../b_reverb/reverb.c \
 		-shared $(LV2LDFLAGS) $(LDFLAGS) $(UILIBS)
+
+verabd.h: VeraBd.ttf
+	xxd -i VeraBd.ttf > verabd.h
 
 install: $(targets)
 ifeq ($(LV2AVAIL), yes)

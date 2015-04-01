@@ -8,15 +8,19 @@ cscope.out
 *.blend2
 
 /b_*/*.so
+b_*/*.dll
 *.dylib
 *.plist
 DWARF
+.DS_STORE
 
 # binaries
 /src/setBfree
+/src/setBfree.exe
 /src/configd
 /src/programd
-/vb3kb/vb3kb
+/ui/setBfreeUI
+/ui/setBfreeUI.exe
 /b_overdrive/jboverdrive
 /b_overdrive/overmaker
 
@@ -28,6 +32,10 @@ DWARF
 /b_synth/manifest.ttl
 /b_synth/b_synth.ttl
 
+# generated xxd/font
+/b_synth/verabd.h
+
 /*.tar.gz
 /doc/html
 /site
+

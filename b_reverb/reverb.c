@@ -84,6 +84,7 @@
  *
  * Index numbers 4, 5 and 6 refers to the all-pass filters.
  */
+#ifndef CONFIGDOCONLY
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,10 +103,10 @@ struct b_reverb *allocReverb() {
     fprintf (stderr, "FATAL: memory allocation failed for reverb.\n");
     exit(1);
   }
-  r->inputGain = 0.025;	/* Input gain value */
+  r->inputGain = 0.1;	/* Input gain value */
   r->fbk = -0.015;	/* Feedback gain */
-  r->wet = 0.3;		/* Output dry gain */
-  r->dry = 0.7;		/* Output wet gain */
+  r->wet = 0.1;		/* Output dry gain */
+  r->dry = 0.9;		/* Output wet gain */
 
   /* These are all  1/sqrt(2) = 0.7071067811865475 */
   r->gain[0] = sqrtf(0.5);	/* FBCF (feedback combfilter) */
@@ -264,19 +265,6 @@ int reverbConfig (struct b_reverb *r, ConfigContext * cfg) {
   return ack;
 }
 
-static const ConfigDoc doc[] = {
-  {"reverb.wet", CFG_DOUBLE, "0.3", "Wet signal level; range [0..1]"},
-  {"reverb.dry", CFG_DOUBLE, "0.7", "Dry signal level; range [0..1]"},
-  {"reverb.inputgain", CFG_DOUBLE, "0.025", "Input Gain; range [0..1]"},
-  {"reverb.outputgain", CFG_DOUBLE, "1.0", "Note: modifies dry and wet values."},
-  {"reverb.mix", CFG_DOUBLE, "0.3", "Note: modifies dry/wet."},
-  {NULL}
-};
-
-const ConfigDoc *reverbDoc () {
-  return doc;
-}
-
 
 /*
  *
@@ -349,4 +337,23 @@ float * reverb (struct b_reverb *r,
   r->yy1 = yy1 + DENORMAL_HACK;
   return outbuf;
 }
+
+
+#else
+# include "cfgParser.h"
+#endif // CONFIGDOCONLY
+
+static const ConfigDoc doc[] = {
+  {"reverb.wet", CFG_DOUBLE, "0.1", "Reverb Wet signal level; range [0..1]", INCOMPLETE_DOC},
+  {"reverb.dry", CFG_DOUBLE, "0.9", "Reverb Dry signal level; range [0..1]", INCOMPLETE_DOC},
+  {"reverb.inputgain", CFG_DOUBLE, "0.1", "Reverb Input Gain", "dB", 0.01, 0.5, 2.0},
+  {"reverb.outputgain", CFG_DOUBLE, "1.0", "Reverb Output Gain (modifies dry/wet)", INCOMPLETE_DOC},
+  {"reverb.mix", CFG_DOUBLE, "0.1", "Reverb Mix (modifies dry/wet).", INCOMPLETE_DOC},
+  DOC_SENTINEL
+};
+
+const ConfigDoc *reverbDoc () {
+  return doc;
+}
+
 /* vi:set ts=8 sts=2 sw=2: */

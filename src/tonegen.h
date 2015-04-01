@@ -1,7 +1,7 @@
 /* setBfree - DSP tonewheel organ
  *
  * Copyright (C) 2003-2004 Fredrik Kilander <fk@dsv.su.se>
- * Copyright (C) 2008-2012 Robin Gareus <robin@gareus.org>
+ * Copyright (C) 2008-2015 Robin Gareus <robin@gareus.org>
  * Copyright (C) 2012 Will Panther <pantherb@setbfree.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -46,7 +46,7 @@
 
 #define NOF_BUSES 27		/* Nof of drawbars/buses */
 
-#define BUFFER_SIZE_SAMPLES (128)
+#define BUFFER_SIZE_SAMPLES 128
 
 
 /**
@@ -302,8 +302,14 @@ struct _oscillator oscillators [NOF_WHEELS + 1];
 /*
  * Vector of active keys, used to correctly manage
  * sounding and non-sounding keys.
+ * boolean 0,1
  */
 unsigned int activeKeys [MAX_KEYS];
+
+/* bitwise compact active keys - used for GUI comm.
+ * these are real non-transposed keys (for GUI)
+ */
+unsigned int _activeKeys [MAX_KEYS/32];
 
 /**
  * The array drawBarGain holds the instantaneous amplification value for
@@ -572,8 +578,8 @@ extern const ConfigDoc *oscDoc ();
 extern void initToneGenerator (struct b_tonegen *t, void *m);
 extern void freeToneGenerator (struct b_tonegen *t);
 
-extern void oscKeyOff (struct b_tonegen *t, unsigned char midiNote);
-extern void oscKeyOn (struct b_tonegen *t, unsigned char midiNote);
+extern void oscKeyOff (struct b_tonegen *t, unsigned char midiNote, unsigned char realKey);
+extern void oscKeyOn (struct b_tonegen *t, unsigned char midiNote, unsigned char realKey);
 extern void setDrawBars (void *inst, unsigned int manual, unsigned int setting []);
 extern void oscGenerateFragment (struct b_tonegen *t, float * buf, size_t lengthSamples);
 

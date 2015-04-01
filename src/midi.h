@@ -1,7 +1,7 @@
 /* setBfree - DSP tonewheel organ
  *
  * Copyright (C) 2003-2004 Fredrik Kilander <fk@dsv.su.se>
- * Copyright (C) 2008-2012 Robin Gareus <robin@gareus.org>
+ * Copyright (C) 2008-2015 Robin Gareus <robin@gareus.org>
  * Copyright (C) 2012 Will Panther <pantherb@setbfree.org>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -25,6 +25,12 @@
 #include <stdint.h>
 
 #include "cfgParser.h"
+
+typedef uint8_t midiccflags_t;
+
+enum { // 1,2,4,8,.. - adjust ctrlflg once >8 to uint16_t
+  MFLAG_INV = 1,
+};
 
 void useMIDIControlFunction (void *m, const char * cfname, void (* f) (void *, unsigned char), void *d);
 void callMIDIControlFunction (void *m, const char * cfname, unsigned char val);
@@ -78,7 +84,7 @@ typedef struct _midicc {
 
 void setControlFunctionCallback(void *mcfg, void (* fn) (int, const char *, unsigned char, midiCCmap *, void *), void *d);
 
-void midi_uiassign_cc (void *mcfg, const char *fname);
+void midi_uiassign_cc (void *mcfg, const char *fname, midiccflags_t flags);
 void midi_loopCCAssignment(void *mcfg, int ulp, void (*cb)(const char *, const unsigned char, const unsigned char, const unsigned char, void *), void *arg);
 void midi_channels(void *mcfg, int *upper, int *lower, int *pedals);
 #endif /* MIDI_H */
